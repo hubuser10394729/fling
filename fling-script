@@ -1,0 +1,87 @@
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FlingGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local flingButton = Instance.new("TextButton")
+flingButton.Size = UDim2.new(0, 150, 0, 50)
+flingButton.Position = UDim2.new(0.5, -75, 0.5, -25)
+flingButton.Text = "FLING"
+flingButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- red background
+flingButton.TextColor3 = Color3.new(1, 1, 1) -- white text
+flingButton.Parent = screenGui
+
+local UserInputService = game:GetService("UserInputService")
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+
+flingButton.Active = true
+
+flingButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = flingButton.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+flingButton.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        flingButton.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+local RunService = game:GetService("RunService")
+
+local function fling()
+    local bp = Instance.new("BodyAngularVelocity")
+    bp.AngularVelocity = Vector3.new(0, 100, 0)
+    bp.MaxTorque = Vector3.new(0, math.huge, 0)
+    bp.P = math.huge
+    bp.Parent = hrp
+
+    local connection
+    connection = RunService.Stepped:Connect(function()
+        for _, otherPlayer in pairs(game.Players:GetPlayers()) do
+            if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local otherHRP = otherPlayer.Character.HumanoidRootPart
+                if (hrp.Position - otherHRP.Position).Magnitude < 10 then
+                    local bv = Instance.new("BodyVelocity")
+                    bv.Velocity = (otherHRP.Position - hrp.Position).Unit * 200
+                    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+                    bv.Parent = otherHRP
+                    game.Debris:AddItem(bv, 0.2)
+                end
+            end
+        end
+    end)
+
+    task.delay(15, function()
+        if bp then
+            bp:Destroy()
+        end
+        if connection then
+            connection:Disconnect()
+        end
+    end)
+end
+
+flingButton.MouseButton1Click:Connect(fling)
